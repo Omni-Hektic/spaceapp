@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://spaceapp.dev"><img src="https://raw.githubusercontent.com/oll4com/spaceapp/main/docs/images/spaceapp-hero-banner.png" alt="SpaceApp — The Super Agent App" width="900" /></a>
+  <a href="https://spaceapp.dev/?utm_source=github&utm_medium=readme"><img src="https://raw.githubusercontent.com/oll4com/spaceapp/main/docs/images/spaceapp-hero-banner.png" alt="SpaceApp — The Super Agent App" width="900" /></a>
 </p>
 
 <p align="center">
@@ -16,7 +16,7 @@
 <p align="center">
   Run <b>OpenCode</b>, <b>OpenAI Codex</b>, <b>Claude Code</b>, <b>Google Gemini</b>, <b>Qwen</b>, <b>Kimi</b>, <b>Grok</b>, and <b>DeepSeek</b> concurrently in persistent rooms on your own machine. Rooms organize sessions; they are not a security boundary between mutually untrusted users.
   <br>
-  <a href="https://spaceapp.dev"><b>Explore spaceapp.dev »</b></a> | <a href="https://spaceapp.dev/spaceappmock/"><b>Try Live Demo »</b></a>
+  <a href="https://spaceapp.dev/?utm_source=github&utm_medium=readme"><b>Explore spaceapp.dev »</b></a> | <a href="https://spaceapp.dev/spaceappmock/?utm_source=github&utm_medium=readme"><b>Try Live Demo »</b></a>
 </p>
 
 ---
@@ -92,9 +92,7 @@ Coordinate multi-step tasks conversationally through the Room Agent or speak nat
 - **Hardware**:
   - Minimum (`small` profile): 4 CPU cores, 8 GB-class RAM (at least 7 GiB reported by the operating system), 6.5 GiB free disk.
   - `large` profile (adds the managed browser): 8 CPU cores, 15 GiB RAM, 11 GiB free disk.
-- **Container Engine**: Docker or Podman.
-  - **Docker** (default): If Docker is missing, the installer automatically installs official Docker Desktop (Windows/macOS) or Docker Engine (Linux).
-  - **Podman**: Rootless Podman (≥ 5 with `podman-compose`) is supported on Linux and macOS (`podman machine`). Pass `--engine podman` to select it.
+- **Docker**: If Docker is not installed, the installer automatically installs official Docker Desktop (Windows/macOS) or Docker Engine (Linux).
 
 ### Run the Installation Command
 
@@ -102,8 +100,6 @@ Run the universal command in your terminal:
 
 ```bash
 npx --yes run-spaceapp@latest install
-# Or explicitly select Podman:
-npx --yes run-spaceapp@latest install --engine podman
 ```
 
 > **Windows 11 Tip**: Use **Command Prompt** (`cmd.exe`) or the Command Prompt profile in Windows Terminal. If PowerShell has a restricted execution policy, run `npx.cmd --yes run-spaceapp@latest install`.
