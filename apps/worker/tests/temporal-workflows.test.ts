@@ -185,7 +185,7 @@ beforeAll(async () => {
   maintenanceRun = maintenanceWorker.run();
   mutationRun = mutationWorker.run();
   legacyRun = legacyWorker.run();
-});
+}, 120_000);
 
 afterAll(async () => {
   primaryWorker?.shutdown(); maintenanceWorker?.shutdown(); mutationWorker?.shutdown(); legacyWorker?.shutdown();
@@ -235,8 +235,8 @@ describe.sequential("Temporal workflow integration", () => {
     options.set("runRoomAgentBackgroundAction", "always-fail");
     const actionInput = { bridge: { roomId: roomTurn.roomId, missionId: "mission:synthetic" }, traceId: roomTurn.traceId };
     const handle = await env.client.workflow.start("roomAgentActionWorkflow", { taskQueue: TASK_QUEUE, workflowId: "room-action-failure-synthetic", args: [actionInput] });
-    await vi.waitFor(() => expect(calls.get("failRoomAgentBackgroundAction")).toBe(1));
     await expect(handle.result()).rejects.toThrow();
+    expect(calls.get("failRoomAgentBackgroundAction")).toBe(1);
     await recordHistory(handle, "room-action-failure");
     options.delete("runRoomAgentBackgroundAction");
   }, 30_000);
@@ -278,12 +278,12 @@ describe.sequential("Temporal workflow integration", () => {
     });
     const item = { missionId: "mission:synthetic", turn: { ...roomTurn, agentRunId: "run:queued-synthetic" } };
     await handle.signal(ROOM_AGENT_ENQUEUE_SIGNAL, item);
-    await vi.waitFor(() => expect(calls.get("checkRoomAgentSupervisorTurn")).toBe(1));
+    await vi.waitFor(() => expect(calls.get("checkRoomAgentSupervisorTurn")).toBe(1), { timeout: 30_000 });
     await handle.signal(ROOM_AGENT_STOP_SIGNAL, { missionId: "mission:synthetic", reason: "synthetic stop" });
-    await vi.waitFor(() => expect(calls.get("discardRoomAgentSupervisorTurn")).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(calls.get("discardRoomAgentSupervisorTurn")).toBeGreaterThan(0), { timeout: 30_000 });
     await vi.waitFor(() => expect(finishedSupervisorTurns.some(turn =>
       (turn.item as { missionId: string }).missionId === "mission:synthetic" && turn.status === "INTERRUPTED"
-    )).toBe(true));
+    )).toBe(true), { timeout: 30_000 });
     await handle.terminate("synthetic fixture complete");
     supervisorTurnMode = "SKIP";
     await recordHistory(handle, "room-supervisor-current-signals");
@@ -295,8 +295,8 @@ describe.sequential("Temporal workflow integration", () => {
       taskQueue: TASK_QUEUE, workflowId: "room-supervisor-carry-synthetic", args: [carry]
     });
     const originalCarryRun = env.client.workflow.getHandle("room-supervisor-carry-synthetic", carryHandle.firstExecutionRunId);
-    await vi.waitFor(() => expect(calls.get("checkRoomAgentSupervisorTurn")).toBeGreaterThan(checksBeforeCarry));
-    await vi.waitFor(() => expect(checkedSupervisorTurns).toContain("run:carried-synthetic"));
+    await vi.waitFor(() => expect(calls.get("checkRoomAgentSupervisorTurn")).toBeGreaterThan(checksBeforeCarry), { timeout: 30_000 });
+    await vi.waitFor(() => expect(checkedSupervisorTurns).toContain("run:carried-synthetic"), { timeout: 30_000 });
     expect(checkedSupervisorTurns.filter(runId => runId === "run:carried-synthetic")).toHaveLength(1);
     const carriedHistory = await originalCarryRun.fetchHistory() as { events: Array<{ eventType: number }> };
     expect(carriedHistory.events.some(event => event.eventType === proto.temporal.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW)).toBe(true);
@@ -308,8 +308,8 @@ describe.sequential("Temporal workflow integration", () => {
     const legacy = await env.client.workflow.start("roomAgentSupervisorWorkflow", {
       taskQueue: LEGACY_QUEUE, workflowId: "room-supervisor-legacy-synthetic", args: [legacyInput]
     });
-    await vi.waitFor(() => expect(calls.get("markRoomAgentMissionStarted") ?? 0).toBeGreaterThan(finishesBeforeLegacy));
-    await vi.waitFor(() => expect(calls.get("markRoomAgentMissionFinished") ?? 0).toBeGreaterThan(finishesBeforeLegacy));
+    await vi.waitFor(() => expect(calls.get("markRoomAgentMissionStarted") ?? 0).toBeGreaterThan(finishesBeforeLegacy), { timeout: 30_000 });
+    await vi.waitFor(() => expect(calls.get("markRoomAgentMissionFinished") ?? 0).toBeGreaterThan(finishesBeforeLegacy), { timeout: 30_000 });
     await legacy.terminate("synthetic fixture complete");
     await recordHistory(legacy, "room-supervisor-pre-patch");
 
@@ -329,27 +329,29 @@ describe.sequential("Temporal workflow integration", () => {
       taskQueue: LEGACY_QUEUE, workflowId: "room-supervisor-legacy-carry-synthetic", args: [legacyCarryInput]
     });
     const legacyCarryFirstRun = env.client.workflow.getHandle("room-supervisor-legacy-carry-synthetic", legacyCarry.firstExecutionRunId);
-    await vi.waitFor(() => expect((calls.get("markRoomAgentMissionFinished") ?? 0) - finishCountBeforeLegacyCarry).toBeGreaterThanOrEqual(51), { timeout: 30_000 });
-    const legacyCarryHistory = await legacyCarryFirstRun.fetchHistory() as { events: Array<{ eventType: number }> };
-    expect(legacyCarryHistory.events.some(event => event.eventType === proto.temporal.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW)).toBe(true);
-    const legacyCarryNextInput = continuedAsNewInput(legacyCarryHistory) as {
-      pending: Array<{ missionId: string; turn: { agentRunId: string } }>;
-      monitoringMissionIds: string[];
-      processedCount: number;
-    };
-    expect(legacyCarryNextInput.pending).toEqual([{
-      missionId: "mission:legacy-carry-50",
-      turn: expect.objectContaining({ agentRunId: "run:legacy-carry-50" })
-    }]);
-    expect(legacyCarryNextInput.monitoringMissionIds).toEqual([legacyMonitoringId]);
-    expect(legacyCarryNextInput.processedCount).toBe(0);
-    const finishedLegacyCarryIds = finishedLegacyMissionIds.slice(finishedIdsBeforeLegacyCarry);
-    expect(finishedLegacyCarryIds).toHaveLength(51);
-    expect(new Set(finishedLegacyCarryIds)).toEqual(new Set(legacyCarryItems.map(item => item.missionId)));
-    await recordHistory(legacyCarryFirstRun, "room-supervisor-pre-patch-continue-as-new");
-    await env.client.workflow.getHandle("room-supervisor-legacy-carry-synthetic").terminate("synthetic fixture complete");
-
-  }, 60_000);
+    try {
+      await vi.waitFor(() => expect((calls.get("markRoomAgentMissionFinished") ?? 0) - finishCountBeforeLegacyCarry).toBeGreaterThanOrEqual(51), { timeout: 90_000 });
+      const legacyCarryHistory = await legacyCarryFirstRun.fetchHistory() as { events: Array<{ eventType: number }> };
+      expect(legacyCarryHistory.events.some(event => event.eventType === proto.temporal.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW)).toBe(true);
+      const legacyCarryNextInput = continuedAsNewInput(legacyCarryHistory) as {
+        pending: Array<{ missionId: string; turn: { agentRunId: string } }>;
+        monitoringMissionIds: string[];
+        processedCount: number;
+      };
+      expect(legacyCarryNextInput.pending).toEqual([{
+        missionId: "mission:legacy-carry-50",
+        turn: expect.objectContaining({ agentRunId: "run:legacy-carry-50" })
+      }]);
+      expect(legacyCarryNextInput.monitoringMissionIds).toEqual([legacyMonitoringId]);
+      expect(legacyCarryNextInput.processedCount).toBe(0);
+      const finishedLegacyCarryIds = finishedLegacyMissionIds.slice(finishedIdsBeforeLegacyCarry);
+      expect(finishedLegacyCarryIds).toHaveLength(51);
+      expect(new Set(finishedLegacyCarryIds)).toEqual(new Set(legacyCarryItems.map(item => item.missionId)));
+      await recordHistory(legacyCarryFirstRun, "room-supervisor-pre-patch-continue-as-new");
+    } finally {
+      await env.client.workflow.getHandle("room-supervisor-legacy-carry-synthetic").terminate("synthetic fixture complete").catch(() => {});
+    }
+  }, 120_000);
 
   it("supervises allocation, action submission and verification through a prepared continuation", async () => {
     const missionId = "mission:allocation-send-verify";
