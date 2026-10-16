@@ -98,7 +98,7 @@ jobs:
             if curl -sf http://127.0.0.1:4911/readyz | grep '"ok":true' >/dev/null; then echo "core readyz ok"; break; fi
             sleep 1
           done
-          curl -sf http://127.0.0.1:4911/readyz | grep '"ok":true'
+          curl -sf http://127.0.0.1:4911/readyz | grep '"ok":true' || { docker logs smoke-core; exit 1; }
           docker rm -f smoke-core smoke-postgres || true
           docker network rm spaceapp-smoke-net || true
 
@@ -107,13 +107,14 @@ jobs:
         run: |
           mkdir -p /tmp/smoke-cli-run
           docker run -d --name smoke-cli \
+            -e SPACE_CLI_HOST_SOCKET=/run/spaceapp-cli/host.sock \
             -v /tmp/smoke-cli-run:/run/spaceapp-cli \
             spaceapp-ci:cli-amd64
           for i in $(seq 1 30); do
             if [ -S /tmp/smoke-cli-run/host.sock ]; then echo "cli socket ready"; break; fi
             sleep 1
           done
-          test -S /tmp/smoke-cli-run/host.sock
+          test -S /tmp/smoke-cli-run/host.sock || { docker logs smoke-cli; exit 1; }
           docker rm -f smoke-cli || true
 
       - name: Smoke check browser target
