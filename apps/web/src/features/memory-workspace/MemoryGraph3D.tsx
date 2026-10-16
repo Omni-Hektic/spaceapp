@@ -310,19 +310,6 @@ export function MemoryGraph3D({
     redrawRef.current();
   }, [nodes, edges, positions, coordinates, showTitles, selectedNodeId]);
 
-  // Test WebGL2 support
-  useEffect(() => {
-    if (typeof HTMLCanvasElement === "undefined") {
-      setUseFallback(true);
-      return;
-    }
-    const testCanvas = document.createElement("canvas");
-    const gl = testCanvas.getContext("webgl2");
-    if (!gl) {
-      setUseFallback(true);
-    }
-  }, []);
-
   // WebGL2 Renderer Lifecycle
   useEffect(() => {
     if (useFallback) return;
@@ -444,15 +431,23 @@ export function MemoryGraph3D({
     let validEdges: MemoryGraphEdge[] = [];
     let cachedNodeCount = 0;
     let cachedEdgeVertexCount = 0;
+    let cachedExtent = 60;
 
     const updateDataBuffers = () => {
       const { nodes, edges, positions, coordinates } = current.current;
       validNodes = [];
+      let maxDist = 60;
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i]!;
-        if (coordinates.has(node.id)) validNodes.push(node);
+        const c = coordinates.get(node.id);
+        if (c) {
+          validNodes.push(node);
+          const dist = Math.hypot(c.x, c.y, c.z);
+          if (dist > maxDist) maxDist = dist;
+        }
       }
       cachedNodeCount = validNodes.length;
+      cachedExtent = maxDist;
 
       const posData = new Float32Array(validNodes.length * 3);
       const colorData = new Float32Array(validNodes.length * 4);
@@ -570,7 +565,7 @@ export function MemoryGraph3D({
         updateFocusBuffers(focus);
       }
 
-      const extent = Math.max(60, ...[...coordinates.values()].map(p => Math.hypot(p.x, p.y, p.z)));
+      const extent = cachedExtent;
       const scale = (Math.min(width, height) * 0.4) / extent;
       const camera = cameraRef.current;
 
@@ -677,9 +672,12 @@ export function MemoryGraph3D({
     };
 
     const ensureSpatialIndex = () => {
+      const { nodes, edges, positions, coordinates } = current.current;
+      if (nodes !== lastNodes || edges !== lastEdges || coordinates !== lastCoordinates || positions !== lastPositions) {
+        updateDataBuffers();
+      }
       const camera = cameraRef.current;
-      const { coordinates } = current.current;
-      const extent = Math.max(60, ...[...coordinates.values()].map(p => Math.hypot(p.x, p.y, p.z)));
+      const extent = cachedExtent;
       const scale = (Math.min(width, height) * 0.4) / extent;
 
       if (

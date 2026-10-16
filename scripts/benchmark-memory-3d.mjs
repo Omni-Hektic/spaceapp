@@ -36,7 +36,7 @@ console.log("Hardware & System Specifications:");
 console.log(`  OS: ${hw.platform} ${hw.release} (${hw.arch})`);
 console.log(`  CPU: ${hw.cpuModel} (${hw.cpuCores} logical cores)`);
 console.log(`  RAM: ${hw.totalMemoryGB} GB`);
-console.log("  GPU: Host Graphics Adapter (Tested on Intel HD Graphics 4600 / DirectX 11 / WebGL2)");
+console.log("  GPU: Host Graphics Adapter (GPU execution runs asynchronously via WebGL2 shaders; frame times reflect CPU dispatch and label LOD)");
 console.log("  Note: In WebGL2, 3D projection, rotation, and line drawing run on the GPU via shaders.");
 console.log("        The CPU per-frame work is bounded to Label LOD selection and draw call dispatch.\n");
 
@@ -112,7 +112,7 @@ function benchmarkRenderFrames(size, numFrames = 300) {
   for (let f = 0; f < numFrames; f++) {
     camera.yaw += 0.01;
     camera.pitch += 0.005;
-    camera.zoom = 1.0 + Math.sin(f * 0.05) * 0.5;
+    camera.zoom = 0.5 + (f % 20) * 0.1;
 
     // WebGL2 per-frame CPU work: Label LOD selection (GPU handles projection via vertex shader)
     const t0 = performance.now();
@@ -143,10 +143,12 @@ function benchmarkRenderFrames(size, numFrames = 300) {
   const webglP50 = percentile(webglCpuTimes, 50).toFixed(2);
   const webglP95 = percentile(webglCpuTimes, 95).toFixed(2);
   const legacyP95 = percentile(legacyCpuProjectionTimes, 95).toFixed(2);
+  const target = size >= 50000 ? 33.0 : 16.7;
+  const pass = Number(webglP95) <= target;
 
   console.log(`[${size.toLocaleString()} nodes / ${graph.edges.length.toLocaleString()} edges — ${numFrames} frames]`);
   console.log(`  WebGL2 CPU Frame Time (p50): ${webglP50} ms`);
-  console.log(`  WebGL2 CPU Frame Time (p95): ${webglP95} ms (Target: <= ${size >= 50000 ? "33.0" : "16.7"} ms — PASS)`);
+  console.log(`  WebGL2 CPU Frame Time (p95): ${webglP95} ms (Target: <= ${target.toFixed(1)} ms — ${pass ? "PASS" : "FAIL"})`);
   console.log(`  Legacy Canvas 2D CPU Projection (p95): ${legacyP95} ms (Replaced by GPU vertex shader)\n`);
 }
 

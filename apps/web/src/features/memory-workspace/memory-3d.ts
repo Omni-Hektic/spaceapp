@@ -46,11 +46,13 @@ export function layoutMemoryNetwork3D(
   const py = new Float64Array(count);
   const pz = new Float64Array(count);
 
+  const spread = count > 2000 ? 260 * Math.cbrt(count / 2000) : 260;
+
   for (let i = 0; i < count; i++) {
     const id = ordered[i]!.id;
-    px[i] = (unit(`${id}:x`) - 0.5) * 260;
-    py[i] = (unit(`${id}:y`) - 0.5) * 260;
-    pz[i] = (unit(`${id}:z`) - 0.5) * 260;
+    px[i] = (unit(`${id}:x`) - 0.5) * spread;
+    py[i] = (unit(`${id}:y`) - 0.5) * spread;
+    pz[i] = (unit(`${id}:z`) - 0.5) * spread;
   }
   if (root >= 0) {
     px[root] = 0; py[root] = 0; pz[root] = 0;
@@ -201,6 +203,16 @@ export function layoutMemoryNetwork3D(
   return createResultMap();
 }
 
+/**
+ * Projects a 3D coordinate point to 2D screen coordinates with perspective and yaw/pitch rotation.
+ *
+ * @param point - The 3D coordinates in memory space.
+ * @param camera - The current camera rotation angles and zoom level.
+ * @param scale - Viewport scale factor derived from graph volume extent.
+ * @param width - Viewport width in pixels.
+ * @param height - Viewport height in pixels.
+ * @returns Projected 2D position, camera depth z, and perspective scaling factor.
+ */
 export function projectMemoryPoint(point: MemoryPoint3D, camera: MemoryCamera3D, scale: number, width: number, height: number) {
   const x = point.x * Math.cos(camera.yaw) + point.z * Math.sin(camera.yaw);
   const depth = -point.x * Math.sin(camera.yaw) + point.z * Math.cos(camera.yaw);
@@ -210,7 +222,12 @@ export function projectMemoryPoint(point: MemoryPoint3D, camera: MemoryCamera3D,
   return { x: width / 2 + x * scale * camera.zoom * perspective, y: height / 2 - y * scale * camera.zoom * perspective, z, perspective };
 }
 
-/** Normalized covariance determinant: 0 for a plane, 1 for equal spread in XYZ. */
+/**
+ * Computes normalized covariance determinant: 0 for a flat plane, 1 for equal spread in XYZ.
+ *
+ * @param points - Array of 3D memory points.
+ * @returns Volume ratio between 0 and 1.
+ */
 export function memory3DVolumeRatio(points: MemoryPoint3D[]): number {
   if (points.length < 4) return 0;
   const center = points.reduce((sum, p) => ({ x: sum.x + p.x / points.length, y: sum.y + p.y / points.length, z: sum.z + p.z / points.length }), { x: 0, y: 0, z: 0 });
@@ -359,6 +376,7 @@ export class SpatialPickingIndex {
   private next: Int32Array;
   private points: ProjectedPointForHit[];
   private mask: number;
+  private maxRing: number;
 
   constructor(points: ProjectedPointForHit[], cellSize = 32) {
     this.points = points;
@@ -368,24 +386,29 @@ export class SpatialPickingIndex {
     this.head = new Int32Array(bucketCount).fill(-1);
     this.next = new Int32Array(points.length).fill(-1);
 
+    let maxThreshold = 7;
     for (let i = 0; i < points.length; i++) {
       const p = points[i]!;
+      const threshold = Math.max(7, p.radius + 3);
+      if (threshold > maxThreshold) maxThreshold = threshold;
       const gx = Math.floor(p.x / cellSize);
       const gy = Math.floor(p.y / cellSize);
       const bucket = ((Math.imul(gx, 73856093) ^ Math.imul(gy, 19349663)) >>> 0) & this.mask;
       this.next[i] = this.head[bucket]!;
       this.head[bucket] = i;
     }
+    this.maxRing = Math.max(1, Math.ceil(maxThreshold / cellSize));
   }
 
   findHit(x: number, y: number): string | null {
     const cx = Math.floor(x / this.cellSize);
     const cy = Math.floor(y / this.cellSize);
+    const ring = this.maxRing;
     let bestId: string | null = null;
     let bestZ = Infinity;
 
-    for (let gx = cx - 1; gx <= cx + 1; gx++) {
-      for (let gy = cy - 1; gy <= cy + 1; gy++) {
+    for (let gx = cx - ring; gx <= cx + ring; gx++) {
+      for (let gy = cy - ring; gy <= cy + ring; gy++) {
         const bucket = ((Math.imul(gx, 73856093) ^ Math.imul(gy, 19349663)) >>> 0) & this.mask;
         for (let i = this.head[bucket]!; i !== -1; i = this.next[i]!) {
           const p = this.points[i]!;
