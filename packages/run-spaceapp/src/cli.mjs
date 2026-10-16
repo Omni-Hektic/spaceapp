@@ -1273,6 +1273,7 @@ async function planInteractiveSetup({
   return {
     requestedProfile: parsed.requestedProfile,
     requestedAccessMode: parsed.requestedAccessMode,
+    requestedEngine: parsed.requestedEngine,
     noOpen: parsed.noOpen,
     companionsEnabled: parsed.companionsEnabled,
     telemetryEnabled: false
@@ -2633,7 +2634,9 @@ async function checkPodmanMachineOnMac(execute, profile, stderr) {
   if (!info?.host) return true;
   const hostCpus = Number(info.host.cpus ?? 0);
   const hostMem = Number(info.host.memTotal ?? 0);
-  if ((hostCpus > 0 && hostCpus < req.cpuCount) || (hostMem > 0 && hostMem < req.memoryBytes)) {
+  // Guest kernel reserves ~200-400MB; allow 90% tolerance when validating machine allocation against profile minimum
+  const minRequiredMem = Math.floor(req.memoryBytes * 0.9);
+  if ((hostCpus > 0 && hostCpus < req.cpuCount) || (hostMem > 0 && hostMem < minRequiredMem)) {
     stderr.write(
       `Podman machine does not have enough resources for profile "${profile}".\n` +
       `Detected: ${hostCpus} CPUs, ${formatGibibytes(hostMem)} GiB RAM.\n` +

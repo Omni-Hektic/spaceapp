@@ -825,9 +825,10 @@ export async function prepareInstallation(root, {
       engine: engine ?? "docker"
     });
   }
-  if (engine !== undefined && config.engine !== undefined && config.engine !== engine) {
+  const effectiveStoredEngine = config.engine ?? "docker";
+  if (engine !== undefined && effectiveStoredEngine !== engine) {
     throw new Error(
-      `Switching container engine from "${config.engine}" to "${engine}" on an existing installation is refused because persistent volumes are not shared between engines. Use "${UNIVERSAL_COMMAND} backup" to export your data, reinstall with "--engine ${engine}", and then run "${UNIVERSAL_COMMAND} restore".`
+      `Switching container engine from "${effectiveStoredEngine}" to "${engine}" on an existing installation is refused because persistent volumes are not shared between engines. Use "${UNIVERSAL_COMMAND} backup" to export your data, reinstall with "--engine ${engine}", and then run "${UNIVERSAL_COMMAND} restore".`
     );
   }
   if (config.version !== version) {
