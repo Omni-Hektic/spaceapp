@@ -277,7 +277,7 @@ export async function run(argv, {
   stdin = process.stdin,
   execute = executeCommand,
   inspectResources = inspectSystemResources,
-  ensureDocker = ensureDockerAvailable,
+  ensureDocker = ensureEngineAvailable,
   prepareDockerPath = prepareDockerCliPath,
   request = globalThis.fetch,
   sleep = wait,
@@ -1335,8 +1335,8 @@ async function repairRuntime({ root, config, platform, stdin, stdout, stderr, ex
     "Repair configuration and recreate the current runtime without deleting data.",
     ...plan.actions.map((action) => action.detail)
   ])) return 1;
-  const prerequisites = await ensureDocker({platform, arch, env, stdin, stdout, stderr, execute, sleep: sleep || wait,
-    installArgs: {root,requestedProfile:repaired.profile,requestedAccessMode:repaired.accessMode,noOpen:true,autoConfirm:true}});
+  const prerequisites = await ensureDocker({engine: repaired.engine ?? "docker", platform, arch, env, stdin, stdout, stderr, execute, sleep: sleep || wait,
+    installArgs: {root,requestedProfile:repaired.profile,requestedAccessMode:repaired.accessMode,noOpen:true,autoConfirm:true,engine:repaired.engine ?? "docker"}});
   if(prerequisites.reexecuted || prerequisites.code !== 0) return prerequisites.code;
   config = repaired;
   if (await verifyStorage({ root, config, existingConfig: config, operation: "repair", inspectResources, execute, stdout, stderr }) !== 0) return 1;
@@ -2168,8 +2168,8 @@ async function updateCommand(args, { root, config, version, platform, stdin, std
       return 0;
     }
   }
-  const prerequisites = await ensureDocker({ platform, arch, env, stdin, stdout, stderr, execute,
-    installArgs: { root, requestedProfile: config.profile, noOpen: true, autoConfirm: true } });
+  const prerequisites = await ensureDocker({ engine: config.engine ?? "docker", platform, arch, env, stdin, stdout, stderr, execute,
+    installArgs: { root, requestedProfile: config.profile, noOpen: true, autoConfirm: true, engine: config.engine ?? "docker" } });
   if (prerequisites.reexecuted || prerequisites.code !== 0) return prerequisites.code;
   const resources = await inspectResources(root);
   const storagePlan = await inspectStoragePlan({ root, config: { ...config, version: targetVersion }, existingConfig: config, resources, execute, operation: "upgrade" });

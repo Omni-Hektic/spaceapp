@@ -102,10 +102,10 @@ Key considerations and operational details:
 - **SELinux Enforcing**: On distributions like Fedora, Red Hat Enterprise Linux, and CentOS Stream where SELinux is set to Enforcing, workspace bind mounts (`workspace add`) are automatically configured with the `:z` flag (`bind: { selinux: "z" }`) so that rootless containers can access workspace files with correct file labels.
 - **Data Safety & Engine Isolation**: Docker and Podman use separate container storage and named volumes. Switching engines in-place on an existing installation is blocked to prevent accidental data loss. To migrate between Docker and Podman, export your database with `spaceapp backup`, reinstall with the target `--engine`, and then restore with `spaceapp restore`.
 - **Security Boundaries**: Host-root mode (`--access host-root`) is **strictly refused** under Podman.
-- **macOS Podman Machine**: On macOS, Podman operates inside a virtual machine managed by `podman machine`. The launcher verifies that the active machine has sufficient CPU, RAM, and disk for your chosen profile. If machine resources are insufficient, the launcher provides specific commands to reconfigure it:
+- **macOS Podman Machine**: On macOS, Podman operates inside a virtual machine managed by `podman machine`. The launcher verifies that the active machine has sufficient CPU and memory for your chosen profile (at least 4 CPUs and 7 GiB RAM for the `small` profile). If machine resources are insufficient, the launcher provides specific commands to reconfigure it:
   ```bash
   podman machine stop
-  podman machine set --cpus 4 --memory 8192 --disk-size 50
+  podman machine set --cpus 4 --memory 7168
   podman machine start
   ```
 - **Diagnostics (`doctor`)**: Running `spaceapp doctor` with a Podman installation reports the Podman version, compose provider status, rootless status, cgroup version (cgroup v2), and whether CPU/memory limits are delegated.
