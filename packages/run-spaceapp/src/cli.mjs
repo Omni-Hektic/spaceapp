@@ -346,7 +346,7 @@ export async function run(argv, {
   if (globalFlags.localImages) {
     const originalExecute = execute;
     execute = async (spec, io) => {
-      if (spec.command === "docker" && spec.args?.includes("compose")) {
+      if ((spec.command === "docker" || spec.command === "podman") && spec.args?.includes("compose")) {
         if (spec.args.at(-1) === "pull") {
           stdout.write("Local images only: skipping registry downloads; missing images will fail startup.\n");
           return 0;
@@ -2888,7 +2888,9 @@ async function checkPodmanMachineDoctor(execute, profile) {
   if (!info?.host) return null;
   const hostCpus = Number(info.host.cpus ?? 0);
   const hostMem = Number(info.host.memTotal ?? 0);
-  const ok = hostCpus >= req.cpuCount && hostMem >= req.memoryBytes;
+  // Guest kernel reserves ~200-400MB; allow 90% tolerance when validating machine allocation against profile minimum
+  const minRequiredMem = Math.floor(req.memoryBytes * 0.9);
+  const ok = hostCpus >= req.cpuCount && hostMem >= minRequiredMem;
   return {
     name: "Podman machine resources",
     ok,

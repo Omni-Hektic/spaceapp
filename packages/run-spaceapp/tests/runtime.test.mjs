@@ -206,3 +206,23 @@ test("workspace override renders SELinux z relabeling when engine is podman", ()
   assert.doesNotMatch(compose, /docker\.sock/);
 });
 
+test("composeCommand rejects unsupported engine with informative error", () => {
+  assert.throws(
+    () => composeCommand("up", home, { engine: "containerd" }),
+    /Unsupported container engine "containerd"/
+  );
+});
+
+test("workspace override renders SELinux z relabeling on multi-user mounts when engine is podman", () => {
+  const podmanMultiUserConfig = {
+    ...config,
+    engine: "podman",
+    users: [{ id: "user:alice", workspaces: [] }]
+  };
+  const compose = renderWorkspaceCompose(podmanMultiUserConfig);
+  assert.match(compose, /type: bind/);
+  assert.match(compose, /source: "\/home\/alice\/project"/);
+  assert.match(compose, /target: "\/workspaces\/project"/);
+  assert.match(compose, /bind:\s*\n\s*selinux: "z"/);
+  assert.match(compose, /cli-hosts\.json:ro,z/);
+});

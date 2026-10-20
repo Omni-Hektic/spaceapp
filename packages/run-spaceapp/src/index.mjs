@@ -696,7 +696,8 @@ export function renderWorkspaceCompose(config, { cliSandbox = false } = {}) {
     "      - type: bind",
     `        source: ${JSON.stringify(workspace.hostPath)}`,
     `        target: ${JSON.stringify(workspace.containerPath)}`,
-    `        read_only: ${workspace.readOnly}`
+    `        read_only: ${workspace.readOnly}`,
+    ...(isPodman ? ["        bind:", "          selinux: \"z\""] : [])
   ];
   const userServices = users.flatMap((user) => {
     const slug = userSlug(user.id);
@@ -734,7 +735,7 @@ export function renderWorkspaceCompose(config, { cliSandbox = false } = {}) {
     "      SPACE_CLI_HOST_SOCKETS_FILE: /etc/spaceapp/cli-hosts.json",
     "    volumes:",
     ...(mounts.length > 0 ? mounts : []),
-    "      - ./cli-hosts.json:/etc/spaceapp/cli-hosts.json:ro",
+    `      - ./cli-hosts.json:/etc/spaceapp/cli-hosts.json:ro${isPodman ? ",z" : ""}`,
     ...users.map((user) => `      - spaceapp-cli-socket-${userSlug(user.id)}:/run/spaceapp-cli-users/${userSlug(user.id)}`),
     "  spaceapp-cli:",
     ...service,
@@ -804,6 +805,9 @@ export function composeCommand(action, root, options = {}) {
     } catch {}
   }
   engine = engine ?? "docker";
+  if (!SUPPORTED_ENGINES.includes(engine)) {
+    throw new Error(`Unsupported container engine "${engine}". Supported engines: ${SUPPORTED_ENGINES.join(", ")}`);
+  }
   const base = [
     "compose",
     "--project-name", composeProjectName(root),
